@@ -23,7 +23,7 @@ cp -a arch/arm64/boot/dts/broadcom/bcm*.dtb ./tmp
 TMP_UBOOT_PATH=tmp_uboot
 mkdir -p ${TMP_UBOOT_PATH}
 pushd ${TMP_UBOOT_PATH}
-REPO_URL=http://download.tizen.org/snapshots/tizen/unified/latest/repos/standard/packages/aarch64/
+REPO_URL=http://download.tizen.org/snapshots/tizen/5.0-unified/latest/repos/standard/packages/aarch64/
 rm -f index.html*
 wget ${REPO_URL}
 UBOOT=`awk -F\" '{ print $2 }' index.html | grep u-boot-rpi3`
