@@ -27,12 +27,93 @@ struct prinfo
 };
 
 int nr_get;
-int nr_put;
 
-// traverses ptree by dfs.
-int traverse_ptree(struct task_struct *task, struct prinfo *begin_addr)
+// traverses ptree.
+int traverse_ptree(struct prinfo *begin_addr)
 {
+    struct task_struct *cur_task = &init_task;
+    struct task_struct *next;
+    struct prinfo *cur_prinfo = begin_addr;
     int process_cnt = 0;
+    int write_en = 1;
+    int idx;
+
+    do
+    {
+        next = NULL;
+
+        if (list_empty(&cur_task->sibling) || list_is_last(&cur_task->sibling, &cur_task->parent->children))
+        {
+            if (write_en)
+            {
+                cur_prinfo->next_sibling_pid = 0;
+            }
+        }
+        else
+        {
+            next = list_next_entry(cur_task, sibling);
+            if (write_en)
+            {
+                cur_prinfo->next_sibling_pid = next->pid;
+            }
+        }
+
+        if (list_empty(&cur_task->children))
+        {
+            if (write_en)
+            {
+                cur_prinfo->first_child_pid = 0;
+            }
+        }
+        else
+        {
+            next = list_first_entry(&cur_task->children, struct task_struct, sibling);
+            if (write_en)
+            {
+                cur_prinfo->first_child_pid = next->pid;
+            }
+        }
+
+        if (write_en)
+        {
+            cur_prinfo->uid = (int64_t)__kuid_val(task_uid(cur_task));
+            cur_prinfo->state = (int64_t)cur_task->state;
+            cur_prinfo->pid = cur_task->pid;
+            cur_prinfo->parent_pid = cur_task->parent->pid;
+
+            while (*(cur_task->comm + idx) != '\0')
+            {
+                *(cur_prinfo->comm + idx) = *(cur_task->comm + idx);
+                ++idx;
+            }
+            *(cur_prinfo->comm + idx) = '\0';
+            idx = 0;
+            ++cur_prinfo;
+        }
+
+        ++process_cnt;
+
+        if (next == NULL)
+        {
+            next = cur_task;
+            while (next->pid && list_is_last(&next->sibling, &next->parent->children))
+            {
+                next = next->parent;
+            }
+            if (next->pid)
+            {
+                next = list_next_entry(next, sibling);
+            }
+        }
+
+        if (write_en && process_cnt >= nr_get)
+        {
+            write_en = 0;
+        }
+
+    } while (((cur_task = next)->pid));
+
+    return process_cnt;
 }
 
 int ptree(struct prinfo *buf, int *nr)
@@ -42,8 +123,8 @@ int ptree(struct prinfo *buf, int *nr)
     int get_user_error;
     int put_user_error;
     int copy_to_user_error;
+    int nr_put;
     nr_get = 0;
-    nr_put = 0;
 
     // null check & address validation
     if (!buf || !nr)
@@ -74,8 +155,10 @@ int ptree(struct prinfo *buf, int *nr)
     }
 
     read_lock(&tasklist_lock);
-    process_cnt = traverse_ptree(&init_task, begin_addr);
+    process_cnt = traverse_ptree(begin_addr);
     read_unlock(&tasklist_lock);
+
+    nr_put = nr_get;
 
     if (process_cnt < nr_put)
     {
