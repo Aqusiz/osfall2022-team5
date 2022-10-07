@@ -26,159 +26,60 @@ struct prinfo
     char comm[64];          /* name of program executed */
 };
 
-int nr_get;
+int _nr = 0, cnt = 0;
+struct prinfo *p;
+struct task_struct *temp_task;
 
-// traverses ptree.
-int traverse_ptree(struct prinfo *begin_addr)
-{
-    struct task_struct *cur_task = &init_task;
-    struct task_struct *next;
-    struct prinfo *cur_prinfo = begin_addr;
-    int process_cnt = 0;
-    int write_en = 1;
-    int idx;
+void dfs(struct task_struct *curr_task) {
+    if (cnt >= _nr) return;
+    int i = 0;
+    struct task_struct *iter;
+    struct prinfo *curr_prinfo = &p[cnt];
+    cnt++;
 
-    do
-    {
-        next = NULL;
+    curr_prinfo->state = curr_task->state;
+    curr_prinfo->pid = curr_task->pid;
+    curr_prinfo->parent_pid = curr_task->parent->pid;
+    curr_prinfo->uid = (int64_t)__kuid_val(task_uid(curr_task));
+    for (i = 0; i < TASK_COMM_LEN && curr_task->comm[i] != '\0'; i++) {
+        curr_prinfo->comm[i] = curr_task->comm[i];
+    }
+    curr_prinfo->comm[i] = '\0';
 
-        if (list_empty(&cur_task->sibling) || list_is_last(&cur_task->sibling, &cur_task->parent->children))
-        {
-            if (write_en)
-            {
-                cur_prinfo->next_sibling_pid = 0;
-            }
+    if (list_empty(&curr_task->sibling) 
+    || list_is_last(&curr_task->sibling, &curr_task->parent->children)) curr_prinfo->next_sibling_pid = 0;
+    else {
+        temp_task = list_next_entry(curr_task, sibling);
+        curr_prinfo->next_sibling_pid = temp_task->pid;
+    }
+
+    if (list_empty(&curr_task->children)) curr_prinfo->first_child_pid = 0;
+    else {
+        temp_task = list_first_entry(&curr_task->children, struct task_struct, sibling);
+        curr_prinfo->first_child_pid = temp_task->pid;
+        list_for_each_entry(iter, &curr_task->children, sibling) {
+            dfs(iter);
         }
-        else
-        {
-            next = list_next_entry(cur_task, sibling);
-            if (write_en)
-            {
-                cur_prinfo->next_sibling_pid = next->pid;
-            }
-        }
-
-        if (list_empty(&cur_task->children))
-        {
-            if (write_en)
-            {
-                cur_prinfo->first_child_pid = 0;
-            }
-        }
-        else
-        {
-            next = list_first_entry(&cur_task->children, struct task_struct, sibling);
-            if (write_en)
-            {
-                cur_prinfo->first_child_pid = next->pid;
-            }
-        }
-
-        if (write_en)
-        {
-            cur_prinfo->uid = (int64_t)__kuid_val(task_uid(cur_task));
-            cur_prinfo->state = (int64_t)cur_task->state;
-            cur_prinfo->pid = cur_task->pid;
-            cur_prinfo->parent_pid = cur_task->parent->pid;
-
-            while (*(cur_task->comm + idx) != '\0')
-            {
-                *(cur_prinfo->comm + idx) = *(cur_task->comm + idx);
-                ++idx;
-            }
-            *(cur_prinfo->comm + idx) = '\0';
-            idx = 0;
-            ++cur_prinfo;
-        }
-
-        ++process_cnt;
-
-        if (next == NULL)
-        {
-            next = cur_task;
-            while (next->pid && list_is_last(&next->sibling, &next->parent->children))
-            {
-                next = next->parent;
-            }
-            if (next->pid)
-            {
-                next = list_next_entry(next, sibling);
-            }
-        }
-
-        if (write_en && process_cnt >= nr_get)
-        {
-            write_en = 0;
-        }
-
-    } while (((cur_task = next)->pid));
-
-    return process_cnt;
+    }
 }
 
 int ptree(struct prinfo *buf, int *nr)
 {
-    struct prinfo *begin_addr;
-    int process_cnt;
-    int get_user_error;
-    int put_user_error;
-    int copy_to_user_error;
-    int nr_put;
-    nr_get = 0;
+    struct task_struct *init = &init_task;
+    if (!buf || !nr) return -EINVAL;
+    if (!access_ok(VERIFY_WRITE, nr, sizeof(int))) return -EFAULT;
+    if (get_user(_nr, nr)) return -EFAULT;
+    if (_nr < 1) return -EINVAL;
 
-    // null check & address validation
-    if (!buf || !nr)
-    {
-        return -EINVAL;
-    }
-
-    if (!access_ok(VERIFY_WRITE, nr, sizeof(int)))
-    {
-        return -EFAULT;
-    }
-
-    get_user_error = get_user(nr_get, nr); // error is not zero when error occured during get_user
-    if (get_user_error)
-    {
-        return -EFAULT;
-    }
-
-    if (nr_get < 1)
-    {
-        return -EINVAL;
-    }
-
-    begin_addr = (struct prinfo *)kmalloc(nr_get * sizeof(struct prinfo), GFP_KERNEL);
-    if (!begin_addr)
-    {
-        return -ENOMEM;
-    }
+    p = (struct prinfo *) kmalloc(sizeof(struct prinfo)*_nr, GFP_KERNEL);
 
     read_lock(&tasklist_lock);
-    process_cnt = traverse_ptree(begin_addr);
+    dfs(init);
     read_unlock(&tasklist_lock);
 
-    nr_put = nr_get;
-
-    if (process_cnt < nr_put)
-    {
-        nr_put = process_cnt; // nr_put can be larger than actual number
-    }
-    put_user_error = put_user(nr_put, nr);
-    if (put_user_error)
-    {
-        return -EFAULT;
-    }
-
-    // finally, copy to user memory
-    copy_to_user_error = copy_to_user(buf, begin_addr, sizeof(struct prinfo) * nr_get);
-    if (copy_to_user_error)
-    {
-        return -EFAULT;
-    }
-
-    kfree(begin_addr);
-    return process_cnt;
+    copy_to_user(buf, p, sizeof(struct prinfo) * cnt);
+    kfree(p);
+    return cnt;
 }
 
 void *legacy_syscall = NULL;
