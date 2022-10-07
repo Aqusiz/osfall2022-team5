@@ -200,5 +200,5 @@ static void ptree_mod_exit(void)
     printk("module exit\n");
 }
 
-module_init(hello_mod_init);
-module_exit(hello_mod_exit);
+module_init(ptree_mod_init);
+module_exit(ptree_mod_exit);
