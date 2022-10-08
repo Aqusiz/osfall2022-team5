@@ -17,7 +17,7 @@ struct prinfo {
 
 int main(int argc, char **argv) {
     int cnt;
-    int nr = 100;
+    int nr = 200;
     struct prinfo *p;
     p = (struct prinfo *) malloc(sizeof(struct prinfo) * nr);
     
