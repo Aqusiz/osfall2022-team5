@@ -7,14 +7,12 @@
 #include <linux/sched/task.h>
 #include <linux/slab.h>
 
-// not to be modified
 MODULE_LICENSE("GPL v2");
 
 // For utilizing kernel symbols
 extern void *compat_sys_call_table[];
 extern rwlock_t tasklist_lock;
 
-// not to be modified
 struct prinfo
 {
     int64_t state;          /* current state of process */
@@ -26,17 +24,18 @@ struct prinfo
     char comm[64];          /* name of program executed */
 };
 
-int _nr = 0, cnt = 0;
-struct prinfo *p;
+int _nr = 0, cnt = 0;           // nr value in kernel space, process count
+struct prinfo *p;               // prinfo array in kernel space
 struct task_struct *temp_task;
 
 void dfs(struct task_struct *curr_task) {
-    if (cnt >= _nr) return;
     int i = 0;
-    struct task_struct *iter;
+    struct task_struct *iter;   // iterator for children list
     struct prinfo *curr_prinfo = &p[cnt];
+    
+    if (cnt >= _nr) return;
     cnt++;
-
+    // Build prinfo with current task
     curr_prinfo->state = curr_task->state;
     curr_prinfo->pid = curr_task->pid;
     curr_prinfo->parent_pid = curr_task->parent->pid;
@@ -45,14 +44,16 @@ void dfs(struct task_struct *curr_task) {
         curr_prinfo->comm[i] = curr_task->comm[i];
     }
     curr_prinfo->comm[i] = '\0';
-
+    // Check sibling list
     if (list_empty(&curr_task->sibling) 
-    || list_is_last(&curr_task->sibling, &curr_task->parent->children)) curr_prinfo->next_sibling_pid = 0;
+    || list_is_last(&curr_task->sibling, &curr_task->parent->children)) {
+        curr_prinfo->next_sibling_pid = 0;
+    }
     else {
         temp_task = list_next_entry(curr_task, sibling);
         curr_prinfo->next_sibling_pid = temp_task->pid;
     }
-
+    // Check children list and run recursive dfs
     if (list_empty(&curr_task->children)) curr_prinfo->first_child_pid = 0;
     else {
         temp_task = list_first_entry(&curr_task->children, struct task_struct, sibling);
@@ -66,6 +67,7 @@ void dfs(struct task_struct *curr_task) {
 int ptree(struct prinfo *buf, int *nr)
 {
     struct task_struct *init = &init_task;
+    // Error handling while get values from user space
     if (!buf || !nr) return -EINVAL;
     if (!access_ok(VERIFY_WRITE, nr, sizeof(int))) return -EFAULT;
     if (get_user(_nr, nr)) return -EFAULT;
@@ -77,7 +79,10 @@ int ptree(struct prinfo *buf, int *nr)
     dfs(init);
     read_unlock(&tasklist_lock);
 
-    copy_to_user(buf, p, sizeof(struct prinfo) * cnt);
+    // Error handling while put values to user space
+    if(cnt < _nr) _nr = cnt;
+    if(put_user(_nr, nr)) return -EFAULT;
+    if(copy_to_user(buf, p, sizeof(struct prinfo) * cnt)) return -EFAULT;
     kfree(p);
     return cnt;
 }
@@ -86,7 +91,6 @@ void *legacy_syscall = NULL;
 static int ptree_mod_init(void)
 {
     // Reserve legacy syscall & replace it to yourown
-    // We neet to check whether this way of implementation is right.
     legacy_syscall = compat_sys_call_table[398];
     compat_sys_call_table[398] = ptree;
     printk("module loaded\n");
