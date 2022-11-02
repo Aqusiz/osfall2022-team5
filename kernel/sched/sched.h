@@ -140,10 +140,15 @@ static inline int dl_policy(int policy)
 {
 	return policy == SCHED_DEADLINE;
 }
+// Add policy
+static inline int wrr_policy(int policy)
+{
+	return policy == SCHED_WRR;
+}
 static inline bool valid_policy(int policy)
 {
 	return idle_policy(policy) || fair_policy(policy) ||
-		rt_policy(policy) || dl_policy(policy);
+		rt_policy(policy) || dl_policy(policy) || wrr_policy(policy);
 }
 
 static inline int task_has_rt_policy(struct task_struct *p)
@@ -183,6 +188,11 @@ struct rt_bandwidth {
 };
 
 void __dl_clear_params(struct task_struct *p);
+
+// Add wrr array
+struct wrr_array{
+	struct list_head queue;
+}
 
 /*
  * To keep the bandwidth of -deadline tasks and groups under control
@@ -541,6 +551,19 @@ struct rt_rq {
 #endif
 };
 
+// Add wrr_rq
+struct wrr_rq{
+	struct wrr_array active;
+	unsigned int wrr_nr_running;
+	unsigned int weight_sum;
+	int wrr_queued;
+	struct rq *rq;
+	unsigned int load_balancing_dc;
+
+	raw_spinlock_t wrr_runtime_lock;
+	struct list_head pending_tasks;
+}
+
 /* Deadline class' related fields in a runqueue */
 struct dl_rq {
 	/* runqueue is an rbtree, ordered by deadline */
@@ -708,6 +731,8 @@ struct rq {
 	struct cfs_rq cfs;
 	struct rt_rq rt;
 	struct dl_rq dl;
+	// Add wrr_rq
+	struct wrr_rq wrr;
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
 	/* list of leaf cfs_rq on this cpu: */
@@ -1985,6 +2010,8 @@ print_numa_stats(struct seq_file *m, int node, unsigned long tsf,
 extern void init_cfs_rq(struct cfs_rq *cfs_rq);
 extern void init_rt_rq(struct rt_rq *rt_rq);
 extern void init_dl_rq(struct dl_rq *dl_rq);
+// Define init
+extern void init_wrr_rq(struct wrr_rq *wrr_rq);
 
 extern void cfs_bandwidth_usage_inc(void);
 extern void cfs_bandwidth_usage_dec(void);
