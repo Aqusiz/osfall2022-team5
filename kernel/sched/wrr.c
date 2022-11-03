@@ -1,6 +1,7 @@
 #include "sched.h"
 #define WRR_LOAD_BALANCE_PERIOD 2000
 
+void init_wrr_rq(struct wrr_rq *wrr_rq);
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flag);
 static void dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flag);
 static void yield_task_wrr(struct rq *rq);
@@ -18,8 +19,21 @@ static void switched_to_wrr(struct rq *this_rq, struct task_struct *task);
 
 static void update_curr_wrr(struct rq *rq);
 
-static void trigger_load_balance_wrr(struct rq *rq);
+void trigger_load_balance_wrr(struct rq *rq);
 static void __trigger_load_balance_wrr(struct rq *rq);
+
+void init_wrr_rq(struct wrr_rq *wrr_rq)
+{
+	struct wrr_array *array;
+
+	array = &wrr_rq->active;
+	INIT_LIST_HEAD(&array->queue);
+
+	wrr_rq->wrr_nr_running = 0;
+	wrr_rq->weight_sum = 0;
+	wrr_rq->load_balancing_dc = WRR_LOAD_BALANCE_PERIOD;
+	raw_spin_lock_init(&wrr_rq->wrr_runtime_lock);
+}
 
 static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
 {
@@ -218,7 +232,7 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 	if (--p->wrr.time_slice)
 		return;
 
-	p->wrr.time_slice = calc_wrr_timeslice(p->wrr.weight);
+	p->wrr.time_slice = p->wrr.weight * WRR_TIMESLICE;
 
 	if (queue->prev != queue->next)
 	{
@@ -276,7 +290,7 @@ static void update_curr_wrr(struct rq *rq)
 	cpuacct_charge(curr, delta_exec);
 }
 
-static void trigger_load_balance_wrr(struct rq *rq)
+void trigger_load_balance_wrr(struct rq *rq)
 {
 	struct wrr_rq *wrr_rq = &rq->wrr;
 	int cpu = smp_processor_id();
@@ -340,7 +354,7 @@ static void __trigger_load_balance_wrr()
 		if (max_rq->curr == p) continue;
 		if (!cpumask_test_cpu(min_cpui, &p->cpus_allowed)) continue;
 		if (max_weight_sum - weight <= min_weight_sum + weight) continue;
-		
+
 		if (migrate_weight < weight) {
 			migrate_weight = weight;
 			migrate_se = wrr_se;
