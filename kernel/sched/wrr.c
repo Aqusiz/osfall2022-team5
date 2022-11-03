@@ -11,7 +11,7 @@ static void put_prev_task_wrr(struct rq *rq, struct task_struct *p);
 static int select_task_rq_wrr(struct task_struct *p, int task_cpu, int sd_flag, int flags);
 #endif
 static void set_curr_task_wrr(struct rq *rq);
-static void task_tick_wrr(struct rq *rq, task_struct *p, int queued);
+static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued);
 static void task_fork_wrr(struct task_struct *p);
 static void prio_changed_wrr(struct rq *this_rq, struct task_struct *task, int oldprio);
 static void switched_to_wrr(struct rq *this_rq, struct task_struct *task);
@@ -19,7 +19,7 @@ static void switched_to_wrr(struct rq *this_rq, struct task_struct *task);
 static void update_curr_wrr(struct rq *rq);
 
 void trigger_load_balance_wrr(struct rq *rq);
-static void __trigger_load_balance_wrr(struct rq *rq);
+static void __trigger_load_balance_wrr(void);
 
 void init_wrr_rq(struct wrr_rq *wrr_rq)
 {
@@ -309,18 +309,18 @@ static void __trigger_load_balance_wrr()
 	int min_weight_sum = INT_MAX, max_weight_sum = -1;
 	struct rq *min_rq, *max_rq;
 	struct wrr_rq *min_wrr_rq, *max_wrr_rq;
-	struct list_head head;
-	struct sched_wrr_entity wrr_se;
+	struct list_head *head;
+	struct sched_wrr_entity *wrr_se;
 	int migrate_weight = -1;
-	struct sched_wrr_entity migrate_se = NULL;
+	struct sched_wrr_entity *migrate_se = NULL;
 	unsigned long flags;
 
 	// lock, find max and min weighted cpu idx, and unlock
 	rcu_read_lock();
 	for_each_online_cpu(cpui) {
 		struct rq *curr_rq = cpu_rq(cpui);
-		struct wrr_rq *curr_wrr_rq = &rq->wrr;
-		int curr_weight_sum = wrr_rq->weight_sum;
+		struct wrr_rq *curr_wrr_rq = &curr_rq->wrr;
+		int curr_weight_sum = curr_wrr_rq->weight_sum;
 
 		if (cpui == WRR_CPU_EMPTY) continue;
 
@@ -348,7 +348,7 @@ static void __trigger_load_balance_wrr()
 	head = &max_wrr_rq->active.queue;
 	list_for_each_entry(wrr_se, head, run_list){
 		int weight = wrr_se->weight;
-		struct task_struct *p = container_of(wrr_se);
+		struct task_struct *p = container_of(wrr_se, struct task_struct, wrr);
 		// check eligiblity
 		if (max_rq->curr == p) continue;
 		if (!cpumask_test_cpu(min_cpui, &p->cpus_allowed)) continue;
@@ -361,7 +361,7 @@ static void __trigger_load_balance_wrr()
 	}
 
 	if (migrate_se != NULL) {
-		struct task_struct *p = container_of(migrate_se);
+		struct task_struct *p = container_of(migrate_se, struct task_struct, wrr);
 		p->on_rq = TASK_ON_RQ_MIGRATING;
 		deactivate_task(max_rq, p, DEQUEUE_NOCLOCK);
 		set_task_cpu(p, min_cpui);
