@@ -1,4 +1,4 @@
-# OS project 1
+# OS project 2
 ### Team 5
 ### 강휘현 김준오
 
