@@ -1522,6 +1522,11 @@ extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
 extern const struct sched_class wrr_sched_class;
+#define WRR_DEFAULT_WEIGHT 	10
+#define WRR_TIMESLICE		(10 * HZ/1000)
+#define WRR_CPU_EMPTY		0
+#define WRR_LOAD_BALANCE_PERIOD	(2000 * HZ/1000)
+extern void trigger_load_balance_wrr(struct rq *rq);
 
 
 #ifdef CONFIG_SMP
