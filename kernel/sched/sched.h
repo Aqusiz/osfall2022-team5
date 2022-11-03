@@ -192,7 +192,7 @@ void __dl_clear_params(struct task_struct *p);
 // Add wrr array
 struct wrr_array{
 	struct list_head queue;
-}
+};
 
 /*
  * To keep the bandwidth of -deadline tasks and groups under control
@@ -562,7 +562,7 @@ struct wrr_rq{
 
 	raw_spinlock_t wrr_runtime_lock;
 	struct list_head pending_tasks;
-}
+};
 
 /* Deadline class' related fields in a runqueue */
 struct dl_rq {
@@ -1521,11 +1521,12 @@ extern const struct sched_class dl_sched_class;
 extern const struct sched_class rt_sched_class;
 extern const struct sched_class fair_sched_class;
 extern const struct sched_class idle_sched_class;
-extern const struct sched_class wrr_sched_class;
+
 #define WRR_DEFAULT_WEIGHT 	10
 #define WRR_TIMESLICE		(10 * HZ/1000)
 #define WRR_CPU_EMPTY		0
 #define WRR_LOAD_BALANCE_PERIOD	(2000 * HZ/1000)
+extern const struct sched_class wrr_sched_class;
 extern void trigger_load_balance_wrr(struct rq *rq);
 
 
