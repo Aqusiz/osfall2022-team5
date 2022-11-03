@@ -1,5 +1,4 @@
 #include "sched.h"
-#define WRR_LOAD_BALANCE_PERIOD 2000
 
 void init_wrr_rq(struct wrr_rq *wrr_rq);
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flag);
