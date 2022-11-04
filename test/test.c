@@ -12,12 +12,14 @@ void prime_factor(int n)
     int cur = n;
     int bound = (int)sqrt(n);
     int *cnt = (int *)calloc(bound + 1, sizeof(int));
+    short found = 0;
     int i = 2;
     while (i <= bound)
     {
         if (cur % i == 0)
         {
             cnt[i]++;
+            cur /= i;
         }
         else
         {
@@ -28,8 +30,9 @@ void prime_factor(int n)
     for (int j = 2; j <= bound; j++)
     {
         if (cnt[j])
-            printf("%d^%d ", j, cnt[j]);
+            printf("%d^%d x", j, cnt[j]);
     }
+    printf("%d",cur);
     printf("\n");
 }
 int main(int argc, char *argv[])
