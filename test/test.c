@@ -15,7 +15,7 @@ void prime_factor(int n)
     int i = 2;
     while (i <= bound)
     {
-        if (cur % 2 == 0)
+        if (cur % i == 0)
         {
             cnt[i]++;
         }
@@ -35,6 +35,7 @@ void prime_factor(int n)
 int main(int argc, char *argv[])
 {
     pid_t pid = getpid();
+    srand(time(NULL));
     // generate weight between 1~20
     int random_weight = rand() % 20 + 1;
     int big_prime = 1000000007;
