@@ -1,6 +1,7 @@
 #include "sched.h"
 
 void init_wrr_rq(struct wrr_rq *wrr_rq);
+void update_weight_wrr(struct wrr_rq *wrr_rq, struct sched_wrr_entity *wrr_se, int weight);
 static void enqueue_task_wrr(struct rq *rq, struct task_struct *p, int flag);
 static void dequeue_task_wrr(struct rq *rq, struct task_struct *p, int flag);
 static void yield_task_wrr(struct rq *rq);
@@ -32,6 +33,12 @@ void init_wrr_rq(struct wrr_rq *wrr_rq)
 	wrr_rq->weight_sum = 0;
 	wrr_rq->load_balancing_dc = WRR_LOAD_BALANCE_PERIOD;
 	raw_spin_lock_init(&wrr_rq->wrr_runtime_lock);
+}
+
+void update_weight_wrr(struct wrr_rq *wrr_rq, struct sched_wrr_entity *wrr_se, int weight) {
+	int prev_weight = wrr_se->weight;
+	wrr_se->weight = weight;
+	wrr_rq->weight_sum += (weight - prev_weight);
 }
 
 static void enqueue_wrr_entity(struct rq *rq, struct sched_wrr_entity *wrr_se, unsigned int flags)
@@ -228,9 +235,11 @@ static void task_tick_wrr(struct rq *rq, struct task_struct *p, int queued)
 	update_curr_wrr(rq);
 
 	// decrease timeslice every tick
-	if (--p->wrr.time_slice)
+	if (--p->wrr.time_slice){
+		// printk(KERN_INFO "TIMESLICE %d\n", p->wrr.time_slice);
 		return;
-
+	}
+		
 	p->wrr.time_slice = p->wrr.weight * WRR_TIMESLICE;
 
 	if (queue->prev != queue->next)

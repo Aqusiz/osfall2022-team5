@@ -292,14 +292,147 @@ static void update_curr_wrr(struct rq *rq)
 현재 task의 runtime statistics를 업데이트한다. 실행 시간의 변화량을 구하고, 현재 task의 runtime에 더해준다.
 중간에 변화량이 0 이하인 부분이 있는데, 이 부분은 대부분 true이기 때문에 unlikely로 최적화한다.
 
--------- in progress -------
 ### Load Balancer Implementation
 
+```c
+static void __trigger_load_balance_wrr()
+{
+	int cpui, min_cpui = -1, max_cpui = -1;
+	int min_weight_sum = INT_MAX, max_weight_sum = -1;
+	struct rq *min_rq, *max_rq;
+	struct wrr_rq *min_wrr_rq, *max_wrr_rq;
+	struct list_head *head;
+	struct sched_wrr_entity *wrr_se;
+	int migrate_weight = -1;
+	struct sched_wrr_entity *migrate_se = NULL;
+	unsigned long flags;
+
+	// lock, find max and min weighted cpu idx, and unlock
+	rcu_read_lock();
+	for_each_online_cpu(cpui) {
+		struct rq *curr_rq = cpu_rq(cpui);
+		struct wrr_rq *curr_wrr_rq = &curr_rq->wrr;
+		int curr_weight_sum = curr_wrr_rq->weight_sum;
+
+		if (cpui == WRR_CPU_EMPTY) continue;
+
+		if (curr_weight_sum > max_weight_sum) {
+			max_weight_sum = curr_weight_sum;
+			max_cpui = cpui;
+		}
+
+		if (curr_weight_sum < min_weight_sum) {
+			min_weight_sum = curr_weight_sum;
+			min_cpui = cpui;
+		}
+	}
+	rcu_read_unlock();
+	// init max_rq, min_rq
+	if (max_cpui == min_cpui) return;
+	max_rq = cpu_rq(max_cpui);
+	min_rq = cpu_rq(min_cpui);
+
+	local_irq_save(flags);
+	double_rq_lock(max_rq, min_rq);
+
+	max_wrr_rq = &max_rq->wrr;
+	min_wrr_rq = &min_rq->wrr;
+	head = &max_wrr_rq->active.queue;
+	list_for_each_entry(wrr_se, head, run_list){
+		int weight = wrr_se->weight;
+		struct task_struct *p = container_of(wrr_se, struct task_struct, wrr);
+		// check eligiblity
+		if (max_rq->curr == p) continue;
+		if (!cpumask_test_cpu(min_cpui, &p->cpus_allowed)) continue;
+		if (max_weight_sum - weight <= min_weight_sum + weight) continue;
+
+		if (migrate_weight < weight) {
+			migrate_weight = weight;
+			migrate_se = wrr_se;
+		}
+	}
+
+	if (migrate_se != NULL) {
+		struct task_struct *p = container_of(migrate_se, struct task_struct, wrr);
+		p->on_rq = TASK_ON_RQ_MIGRATING;
+		deactivate_task(max_rq, p, DEQUEUE_NOCLOCK);
+		set_task_cpu(p, min_cpui);
+		activate_task(min_rq, p, ENQUEUE_NOCLOCK);
+		p->on_rq = TASK_ON_RQ_QUEUED;
+	}
+
+	double_rq_unlock(max_rq, min_rq);
+	local_irq_restore(flags);
+	return;
+}
+```
+매 tick마다 호출되는 core.c의 scheduler_tick() 함수 내부에서 trigger_load_balance_wrr() 함수를 호출한다.
+
+trigger_load_balance_wrr() 함수는 wrr_rq의 load_balance_time값을 1씩 감소시키며, 0이 되면 값을 초기화(2000ms)하며 load balancing을 수행한다.
+
+load balancing은 하나의 CPU만 수행하면 되므로, cpumask_first() 함수를 사용하여, 현재 CPU가 online인 CPU 중 가장 번호가 빠른 CPU인 경우에만 load balancing을 수행하도록 하였다.
+
+load balancing 과정은 다음과 같다.
 
 ### System Call Implementation
 
+```c
+long sched_setweight(pid_t pid, int weight)
+{
+	struct rq *rq;
+	struct task_struct *p;
+	struct rq_flags rf;
+	int prev_weight;
+	int euid = current_euid().val;
 
-## 3. Investigation of process tree
+	if (pid < 0) return -EINVAL;
+	if (weight < 1 || weight > 20) return -EINVAL;
+
+	if((p = find_process_by_pid(pid)) == NULL) return -EINVAL;
+	
+	task_rq_lock(p, &rf);
+	rq = task_rq(p);
+
+	if (p->policy != SCHED_WRR) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+	if (p->wrr.weight < weight && euid != 0) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+	if (p->wrr.weight >= weight && euid != 00 && !check_same_owner(p)) {
+		task_rq_unlock(rq, p, &rf);
+		return -EPERM;
+	}
+
+	prev_weight = p->wrr.weight;
+	if (p->wrr.on_rq) {
+		rq->wrr.weight_sum += weight - prev_weight;
+	}
+	p->wrr.time_slice = weight*WRR_TIMESLICE;
+	p->wrr.weight = weight;
+
+	task_rq_unlock(rq, p, &rf);
+	return 0;
+}
+
+long sched_getweight(pid_t pid)
+{
+	struct task_struct *p;
+
+	if (pid < 0) return -EINVAL;
+
+	p = find_process_by_pid(pid);
+
+	if (p == NULL) return -EINVAL;
+	if (p->policy != SCHED_WRR) return -EINVAL;
+
+	return p->wrr.weight;
+}
+```
+
+## 3. Investigation of Weighted Round Robin Scheduler
 
 
 ## 4. Lessons learned

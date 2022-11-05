@@ -7,13 +7,12 @@
 #include <time.h>
 #include <sys/syscall.h>
 
-void prime_factor(int n)
+void prime_factor(long long n)
 {
-    int cur = n;
-    int bound = (int)sqrt(n);
-    int *cnt = (int *)calloc(bound + 1, sizeof(int));
-    short found = 0;
-    int i = 2;
+    long long  cur = n;
+    long long bound = (long long)sqrt(n);
+    long long *cnt = (long long *)calloc(bound + 1, sizeof(long long));
+    long long i = 2;
     while (i <= bound)
     {
         if (cur % i == 0)
@@ -26,13 +25,13 @@ void prime_factor(int n)
             i++;
         }
     }
-    printf("%d's prime factorization is : ", n);
-    for (int j = 2; j <= bound; j++)
+    printf("%lld's prime factorization is : ", n);
+    for (long long j = 2; j <= bound; j++)
     {
         if (cnt[j])
-            printf("%d^%d x", j, cnt[j]);
+            printf("%lld^%lld x", j, cnt[j]);
     }
-    printf("%d",cur);
+    printf("%lld",cur);
     printf("\n");
 }
 int main(int argc, char *argv[])
@@ -41,7 +40,7 @@ int main(int argc, char *argv[])
     srand(time(NULL));
     // generate weight between 1~20
     int random_weight = rand() % 20 + 1;
-    int big_prime = 1000000007;
+    long long big_prime = (long long)10000000000000007;
 
     const struct sched_param params = {0};
 
@@ -57,5 +56,5 @@ int main(int argc, char *argv[])
     prime_factor(big_prime);
     clock_t end = clock();
 
-    printf("weight : %d, time : %lf \n", random_weight, (double)end - start);
+    printf("weight : %d, time : %lf \n", random_weight, (double)(end - start)/1000);
 }

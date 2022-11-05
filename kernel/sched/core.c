@@ -6818,7 +6818,10 @@ long sched_setweight(pid_t pid, int weight)
 	}
 
 	prev_weight = p->wrr.weight;
-	if (p->wrr.on_rq) rq->wrr.weight_sum += weight - prev_weight;
+	if (p->wrr.on_rq) {
+		rq->wrr.weight_sum += weight - prev_weight;
+	}
+	p->wrr.time_slice = weight*WRR_TIMESLICE;
 	p->wrr.weight = weight;
 
 	task_rq_unlock(rq, p, &rf);
