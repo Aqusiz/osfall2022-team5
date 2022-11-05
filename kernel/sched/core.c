@@ -2396,6 +2396,7 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 		p->sched_class = &rt_sched_class;
 	} else if (p->policy == SCHED_WRR) {
 		p->sched_class = &wrr_sched_class;
+		p->wrr.weight = current->wrr.weight;
 	}
 	else {
 		p->sched_class = &fair_sched_class;
