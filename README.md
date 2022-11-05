@@ -198,7 +198,7 @@ static struct task_struct *pick_next_task_wrr(struct rq *rq, struct task_struct 
 	return p;
 }
 ```
-pick_next는 간단하다. wrr_rq의 리스트 맨 앞의 태스크를 가져온다.
+pick_next는 다음 task를 가져온다. wrr_rq의 리스트 맨 앞의 태스크를 가져온다.
 ```c
 static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int flags)
 {
@@ -208,7 +208,6 @@ static int select_task_rq_wrr(struct task_struct *p, int cpu, int sd_flag, int f
 
 	rcu_read_lock();
 
-	// https://stackoverflow.com/questions/24437724/diff-between-various-cpu-masks-linux-kernel
 	for_each_online_cpu(cpui)
 	{
 		struct rq *rq = cpu_rq(cpui);
@@ -275,7 +274,6 @@ static void update_curr_wrr(struct rq *rq)
 	if (unlikely((s64)delta_exec <= 0))
 		return;
 
-	/* Kick cpufreq (see the comment in kernel/sched/sched.h). */
 	cpufreq_update_util(rq, SCHED_CPUFREQ_RT);
 
 	schedstat_set(curr->se.statistics.exec_max,
@@ -366,13 +364,10 @@ static void __trigger_load_balance_wrr()
 	return;
 }
 ```
-매 tick마다 호출되는 core.c의 scheduler_tick() 함수 내부에서 trigger_load_balance_wrr() 함수를 호출한다.
-
-trigger_load_balance_wrr() 함수는 wrr_rq의 load_balance_time값을 1씩 감소시키며, 0이 되면 값을 초기화(2000ms)하며 load balancing을 수행한다.
-
-load balancing은 하나의 CPU만 수행하면 되므로, cpumask_first() 함수를 사용하여, 현재 CPU가 online인 CPU 중 가장 번호가 빠른 CPU인 경우에만 load balancing을 수행하도록 하였다.
-
-load balancing 과정은 다음과 같다.
+Help documentation의 내용을 그대로 구현한다.
+cpu를 순회해야 하므로 먼저 rcu lock을 잡고, cpu를 순회하며 최소, 최대 weight_sum을 갖는 cpu를 각각 찾는다.
+그 다음 두 cpu의 run queue에 lock을 잡은 뒤 rq내에서 weight_sum을 역전시키지 않는 최대 weight task를 찾는다.
+그 다음 해당 task를 migrate시킨다. 
 
 ### System Call Implementation
 
@@ -431,8 +426,69 @@ long sched_getweight(pid_t pid)
 	return p->wrr.weight;
 }
 ```
+sched_setweight는 process의 weight를 설정한다.
+set이 일어나기 전에 user가 process의 owner인지를 확인하고, 예외 케이스를 확인한다.
+process가 rq에 있는 상태라면 weight_sum이 바뀌므로 같이 업데이트를 해준다. 또한 time_slice도 바뀌어야 하므로 같이 업데이트 해준다.
+
+scehd_getweight는 예외 케이스를 제외하면 정상적으로 weight를 반환한다.
 
 ## 3. Investigation of Weighted Round Robin Scheduler
+```c
+int main(int argc, char *argv[])
+{
+    pid_t pid = getpid();
+    srand(time(NULL));
+    // generate weight between 1~20
+    int random_weight = rand() % 20 + 1;
+    long long big_prime = (long long)10000000000000007;
 
+    const struct sched_param params = {0};
+
+    int res = sched_setscheduler(pid, SCHED_WRR, &params);
+    res = sched_getscheduler(pid);
+    if (res < 0)
+        return 0;
+    if (res = syscall(398, pid, random_weight) < 0)
+        printf("weight setting failed");
+    printf("check weight. random_weight : %d, syscall get_weight : %d \n", random_weight, (int)syscall(399, pid));
+
+    clock_t start = clock();
+    prime_factor(big_prime);
+    clock_t end = clock();
+
+    printf("weight : %d, time : %lf \n", random_weight, (double)(end - start)/1000);
+}
+```
+
+위는 random weight를 통해 큰 수를 prime factorization하는 프로그램이다. 이를 여러번 돌려가며 소요되는 시간을 관찰해 보았다.
+```shell
+10000000000000007's prime factorization is : 53^1 x113^1 x277^1 x1117^1 x5396507^1 x1
+weight : 4, time : 187050.225000 
+
+
+10000000000000007's prime factorization is : 53^1 x113^1 x277^1 x1117^1 x5396507^1 x1
+weight : 8, time : 86037.420000 
+
+10000000000000007's prime factorization is : 53^1 x113^1 x277^1 x1117^1 x5396507^1 x1
+weight : 9, time : 81563.953000 
+
+
+10000000000000007's prime factorization is : 53^1 x113^1 x277^1 x1117^1 x5396507^1 x1
+weight : 17, time : 59726.909000 
+
+
+10000000000000007's prime factorization is : 53^1 x113^1 x277^1 x1117^1 x5396507^1 x1
+weight : 20, time : 59439.712000 
+```
+이론적으로는 weight와 소요 시간은 반비례해야한다.
+weight가 커지면 시간이 줄어드는 경향성은 보이나, 명확한 비례관계를 관찰하기는 어렵다. 
+그 이유를 추측해보면 다음과 같다.
+1. 너무 많은 프로세스가 동시에 돌아가고 있다. 그리고 모든 프로세스가 wrr인 것은 아니기 때문에 예측대로 되지 않을 수 있다. 
+2. 같은 프로그램을 여러번 실행하다 보니 caching에 의해 시간이 예측할 수 없게 변한 것일 수 있다.
+3. load balancing은 lock을 해야하는데, 이러한 처리들이 비효율적이기 때문에 소요시간에 영향을 줄 수 있다.
 
 ## 4. Lessons learned
+
+- 이전에는 system call을 모듈화하여 과정이 비교적 간단했는데, 이번에는 system call을 직접 등록하게 되었다. 그 과정에서 system call table을 포함한 linux의 낮은 레벨의 코드를 많이 읽어보아야 했는데, 이 과정에서 system call이 어떻게 등록되고 호출되는지 이해할 수 있었다.
+- 다른 scheduler의 코드들을 읽어보며 이론상의 내용과 실제 구현을 비교해볼 수 있었다. 
+- C에서의 클래스 구현과 이용을 배울 수 있었다.
