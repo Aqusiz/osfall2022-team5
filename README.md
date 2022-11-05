@@ -9,7 +9,7 @@
 커널 디렉토리(/osfall2022-team5) 내부에서 ./build-rpi3-arm64.sh
 
 테스트 프로그램 컴파일링)
-/osfall2022-team5/test 디렉토리에서 arm-linux-gnueabi-gcc -I../include test.c -o test
+/osfall2022-team5/test 디렉토리에서 arm-linux-gnueabi-gcc -I../include test.c -o test -lm
 
 tizen 내부에 집어넣는 법)
 sudo mount tizen-image/rootfs.img {mount directory(임의로 지정)}
