@@ -13,3 +13,10 @@ long rotunlock_write(int degree, int range);
 // when a thread that has holding or wating locks is terminating
 void exit_rotlock();
 void do_exit();
+
+// sets the current device rotation in the kernel
+// syscall number 398
+SYSCALL_DEFINE1(set_rotation, int, degree)
+{
+
+}
