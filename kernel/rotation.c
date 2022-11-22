@@ -13,7 +13,10 @@ long rotunlock_write(int degree, int range);
 // release holding locks, remove waiting locks
 // when a thread that has holding or wating locks is terminating
 // need to think about return type and parameters
-void exit_rotlock(struct task_struct *tsk);
+void exit_rotlock(struct task_struct *tsk)
+{
+    return;
+}
 
 // sets the current device rotation in the kernel
 // syscall number 398
