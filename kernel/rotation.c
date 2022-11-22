@@ -1,5 +1,6 @@
 #include <linux/rotation.h>
 #include <linux/syscalls.h>
+#include <linux/sched.h>
 
 // 0 <= degree < 360, 0 < range < 180
 // degree - range <= LOCK RANGE <= degree + range
@@ -11,8 +12,8 @@ long rotunlock_write(int degree, int range);
 
 // release holding locks, remove waiting locks
 // when a thread that has holding or wating locks is terminating
-void exit_rotlock();
-void do_exit();
+// need to think about return type and parameters
+void exit_rotlock(struct task_struct *tsk);
 
 // sets the current device rotation in the kernel
 // syscall number 398

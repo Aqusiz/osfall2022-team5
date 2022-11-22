@@ -62,6 +62,7 @@
 #include <linux/random.h>
 #include <linux/rcuwait.h>
 #include <linux/compat.h>
+#include <linux/rotation.h>
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
@@ -855,6 +856,7 @@ void __noreturn do_exit(long code)
 		acct_process();
 	trace_sched_process_exit(tsk);
 
+	exit_rotlock(tsk);
 	exit_sem(tsk);
 	exit_shm(tsk);
 	exit_files(tsk);
