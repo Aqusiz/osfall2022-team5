@@ -97,3 +97,14 @@ boot.img
 modules.img
 !tizen-unified_20181024.1_iot-headless-2parts-armv7l-rpi3.tar.gz
 !/rpi3/boot/*
+.config
+.tmp_System.map
+.tmp_kallsyms1.S
+.tmp_kallsyms1.o
+.tmp_kallsyms2.S
+.tmp_kallsyms2.o
+.tmp_versions/hello_mod.mod
+.tmp_versions/ptree_mod.mod
+.tmp_vmlinux1
+.tmp_vmlinux2
+.version
