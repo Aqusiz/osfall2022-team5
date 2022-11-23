@@ -1,6 +1,12 @@
+#include <linux/kernel.h>
 #include <linux/rotation.h>
 #include <linux/syscalls.h>
 #include <linux/sched.h>
+#include <linux/semaphore.h>
+
+int rotation = 0;
+
+int readcnt = 0, writecnt = 0;
 
 // 0 <= degree < 360, 0 < range < 180
 // degree - range <= LOCK RANGE <= degree + range
@@ -22,5 +28,12 @@ void exit_rotlock(struct task_struct *tsk)
 // syscall number 398
 SYSCALL_DEFINE1(set_rotation, int, degree)
 {
+    if (degree < 0 || degree >= 360)
+        return -EINVAL;
+    
+    rotation = degree;
+    // debug print
+    printk("rotation: %d\n", rotation);
 
+    return rotation;
 }
