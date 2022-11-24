@@ -413,3 +413,7 @@
 396	common	pkey_free		sys_pkey_free
 397	common	statx			sys_statx
 398 common  set_rotation    sys_set_rotation
+399 common  rotlock_read    sys_rotlock_read
+400 common  rotlock_write   sys_rotlock_write
+401 common  rotunlock_read  sys_rotunlock_read
+402 common  rotunlock_write sys_rotunlock_write
