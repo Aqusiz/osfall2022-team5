@@ -3,7 +3,7 @@
 #include <linux/sched.h>
 #include <linux/mutex.h>
 
-#define INIT_ROTATION(name) = {
+#define INIT_ROTATION(name) {\
     .degree = -1,\
     .read_wait_list = {\
         .degree = -1,\

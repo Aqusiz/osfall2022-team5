@@ -26,7 +26,7 @@ long rotlock_write(int degree, int range); /* degree - range <= LOCK RANGE <= de
 long rotunlock_read(int degree, int range);  /* 0 <= degree < 360 , 0 < range < 180 */
 long rotunlock_write(int degree, int range); /* degree - range <= LOCK RANGE <= degree + range */
 
-global_rot_state init_rotation = INIT_global_rot_state(init_rotation);
+global_rot_state init_rotation = INIT_ROTATION(init_rotation);
 EXPORT_SYMBOL(init_rotation);
 
 // iterate waiting list to wake up one in range
@@ -147,7 +147,7 @@ long rotlock_read(int degree, int range) {  /* 0 <= degree < 360 , 0 < range < 1
     new_lock_entity->range = range;
     new_lock_entity->wait = 0;
     new_lock_entity->task_struct = current;
-    init_waitq_head(&new_lock_entity->q);
+    init_waitqueue_head(&new_lock_entity->q);
     INIT_LIST_HEAD(&new_lock_entity->lock_list);
 
     mutex_lock(&rot->lock);
@@ -201,7 +201,7 @@ long rotlock_write(int degree, int range) { /* degree - range <= LOCK RANGE <= d
     new_lock_entity->range = range;
     new_lock_entity->wait = 0;
     new_lock_entity->task_struct = current;
-    init_waitq_head(&new_lock_entity->q);
+    init_waitqueue_head(&new_lock_entity->q);
     INIT_LIST_HEAD(&new_lock_entity->lock_list);
 
     mutex_lock(&rot->lock);

@@ -856,7 +856,7 @@ void __noreturn do_exit(long code)
 		acct_process();
 	trace_sched_process_exit(tsk);
 
-	exit_rotlock(tsk);
+	exit_rot_lock(tsk);
 	exit_sem(tsk);
 	exit_shm(tsk);
 	exit_files(tsk);
