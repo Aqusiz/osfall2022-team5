@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
             printf("fopen error\n");
             return 1;
         }
-
+        printf("selector: %d\n", num);
         fprintf(fp, "%d\n", num++);
         fclose(fp);
         ROTUNLOCK_WRITE(90, 90);
