@@ -179,6 +179,43 @@ static ssize_t ext2_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	return generic_file_write_iter(iocb, from);
 }
 
+int ext2_set_gps_location(struct inode *inode) {
+	struct ext2_inode_info *ei = EXT2_I(inode);
+	struct gps_location *loc = &init_location;
+	location_lock();
+	// lat, lng to U32
+	ei->i_lat_integer = (__u32)(loc->lat_integer + 90);
+	ei->i_lng_integer = (__u32)(loc->lng_integer + 180);
+	ei->i_lat_fractional = (__u32)loc->lat_fractional;
+	ei->i_lng_fractional = (__u32)loc->lng_fractional;
+	ei->i_accuracy = (__u32)loc->accuracy;
+	location_unlock();
+	return 0;
+}
+
+int ext2_get_gps_location(struct inode *inode, struct gps_location *loc) {
+	struct ext2_inode_info *ei = EXT2_I(inode);
+	// U32 to lat, lng
+	loc->lat_integer = ((int)ei->i_lat_integer - 90);
+	loc->lng_integer = ((int)ei->i_lng_integer - 180);
+	loc->lat_fractional = (int)ei->i_lat_fractional;
+	loc->lng_fractional = (int)ei->i_lng_fractional;
+	loc->accuracy = (int)ei->i_accuracy;
+	return 0;
+}
+
+int ext2_permission(struct inode *inode, int mask) {
+	struct gps_location loc;
+	ext2_get_gps_location(inode, &loc);
+
+	// check MAY_GET_LOCATION
+	if (!(mask & MAY_GET_LOCATION) && !check_access(&loc)) {
+		return -EACCES;
+	}
+
+	return generic_permission(inode, mask);
+}
+
 const struct file_operations ext2_file_operations = {
 	.llseek		= generic_file_llseek,
 	.read_iter	= ext2_file_read_iter,
@@ -204,4 +241,7 @@ const struct inode_operations ext2_file_inode_operations = {
 	.get_acl	= ext2_get_acl,
 	.set_acl	= ext2_set_acl,
 	.fiemap		= ext2_fiemap,
+	.set_gps_location = ext2_set_gps_location,
+	.get_gps_location = ext2_get_gps_location,
+	.permission = ext2_permission,
 };
