@@ -1,3 +1,6 @@
+#ifndef _LINUX_GPS_H
+#define _LINUX_GPS_H
+
 struct gps_location
 {
     int lat_integer;
@@ -16,3 +19,8 @@ struct gps_location
 }
 
 extern struct gps_location init_location;
+void location_lock(void);
+void location_unlock(void);
+int check_access(struct gps_location *);
+
+#endif
