@@ -548,6 +548,14 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 		}
 		inc_syscw(current);
 		file_end_write(file);
+		// when write, call set_gps_location
+		if (file->f_inode) {
+			struct inode *inode = file->f_inode;
+			// check ext2
+			if (inode->i_op->set_gps_location) {
+				inode->i_op->set_gps_location(inode);
+			}
+		}
 	}
 
 	return ret;
