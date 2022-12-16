@@ -1421,12 +1421,6 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	inode->i_mtime.tv_sec = (signed)le32_to_cpu(raw_inode->i_mtime);
 	inode->i_atime.tv_nsec = inode->i_mtime.tv_nsec = inode->i_ctime.tv_nsec = 0;
 	ei->i_dtime = le32_to_cpu(raw_inode->i_dtime);
-	// for gps location
-	ei->i_lat_integer = le32_to_cpu(raw_inode->i_lat_integer);
-	ei->i_lng_integer = le32_to_cpu(raw_inode->i_lng_integer);
-	ei->i_lat_fractional = le32_to_cpu(raw_inode->i_lat_fractional);
-	ei->i_lng_fractional = le32_to_cpu(raw_inode->i_lng_fractional);
-	ei->i_accuracy = le32_to_cpu(raw_inode->i_accuracy);
 	/* We now have enough fields to check if the inode was active or not.
 	 * This is needed because nfsd might try to access dead inodes
 	 * the test is that same one that e2fsck uses
@@ -1445,6 +1439,12 @@ struct inode *ext2_iget (struct super_block *sb, unsigned long ino)
 	ei->i_frag_size = raw_inode->i_fsize;
 	ei->i_file_acl = le32_to_cpu(raw_inode->i_file_acl);
 	ei->i_dir_acl = 0;
+	// for gps location
+	ei->i_lat_integer = le32_to_cpu(raw_inode->i_lat_integer);
+	ei->i_lng_integer = le32_to_cpu(raw_inode->i_lng_integer);
+	ei->i_lat_fractional = le32_to_cpu(raw_inode->i_lat_fractional);
+	ei->i_lng_fractional = le32_to_cpu(raw_inode->i_lng_fractional);
+	ei->i_accuracy = le32_to_cpu(raw_inode->i_accuracy);
 
 	if (ei->i_file_acl &&
 	    !ext2_data_block_valid(EXT2_SB(sb), ei->i_file_acl, 1)) {
