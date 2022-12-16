@@ -13,7 +13,7 @@
 long set_gps_location(struct gps_location __user *loc);
 long get_gps_location(const char __user *pathname, struct gps_location __user *loc);
 
-static struct gps_location init_location = {
+struct gps_location init_location = {
     .lat_integer = 0,
     .lat_fractional = 0,
     .lng_integer = 0,
@@ -266,8 +266,8 @@ int check_access(struct gps_location *loc)
 
     cur_lat = MFLOAT(curr_loc.lat_integer, curr_loc.lat_fractional);
     cur_lng = MFLOAT(curr_loc.lng_integer, curr_loc.lng_fractional);
-    loc_lat = MFLOAT(loc.lat_integer, loc.lat_fractional);
-    loc_lng = MFLOAT(loc.lng_integer, loc.lng_fractional);
+    loc_lat = MFLOAT(loc->lat_integer, loc->lat_fractional);
+    loc_lng = MFLOAT(loc->lng_integer, loc->lng_fractional);
 
     avg_lat = avg_float(cur_lat, loc_lat);
     lat_diff = abs_float(sub_float(cur_lat, loc_lat));
@@ -281,7 +281,7 @@ int check_access(struct gps_location *loc)
     rot_radius *= cos_float(avg_lat).fractional;
     rot_radius /= PRECISION;
 
-    dist = curr_loc.accuracy + loc.accuracy;
+    dist = curr_loc.accuracy + loc->accuracy;
 
     dx = deg_arc_len(lng_diff, rot_radius);
     dy = deg_arc_len(lat_diff, EARTH_R);
