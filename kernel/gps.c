@@ -253,23 +253,6 @@ struct my_float deg_arc_len(struct my_float deg, int radius)
     return mul_float(rad, MFLOAT(radius, 0));
 }
 
-static int valid_gps_location(struct gps_location loc)
-{
-    long long int lat = PRECISION * loc.lat_integer + loc.lat_fractional;
-    long long int lng = PRECISION * loc.lng_integer + loc.lng_fractional;
-
-    if (loc.lat_fractional < 0 || loc.lat_fractional > 999999 || loc.lng_fractional < 0 || loc.lng_fractional > 999999)
-        return 0;
-
-    if (lat < -90 * PRECISION || lat > 90 * PRECISION || lng < -180 * PRECISION || lng > 180 * PRECISION)
-        return 0;
-
-    if (loc.accuracy < 0)
-        return 0;
-
-    return 1;
-}
-
 // return 1 only if current location & file location overlap, else 0
 int check_access(struct gps_location *loc)
 {
