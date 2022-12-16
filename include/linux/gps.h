@@ -9,3 +9,10 @@ struct gps_location
     int lng_fractional;
     int accuracy;
 };
+
+extern struct gps_location init_location;
+void location_lock(void);
+void location_unlock(void);
+int check_access(struct gps_location *);
+
+#endif
